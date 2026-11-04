@@ -413,4 +413,12 @@ This setup demonstrates the integration of network security monitoring with SIEM
   
   ![[Npcap-Verify.png]]
   
+  ![[Suricata running with Engine started.png]]
   
+  
+  ![[fast.log showing ICMP Test Alert..png]]
+  
+  
+  ![[eve.json showing DNS and TLS events..png]]
+  
+  ![[wazuh-dashboard.png]]
