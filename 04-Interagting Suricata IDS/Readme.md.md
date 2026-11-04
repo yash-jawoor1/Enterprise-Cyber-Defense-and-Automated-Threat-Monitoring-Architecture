@@ -401,3 +401,11 @@ This setup demonstrates the integration of network security monitoring with SIEM
 - SIEM Log Integration.
     
 - Security Event Monitoring.
+  
+  
+  
+  
+  ![[Suricata-Installation.png]]
+  
+  
+  ![[Npcap-Installation.png]]
