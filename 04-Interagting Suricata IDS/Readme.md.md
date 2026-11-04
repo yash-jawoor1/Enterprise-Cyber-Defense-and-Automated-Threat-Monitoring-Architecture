@@ -409,3 +409,8 @@ This setup demonstrates the integration of network security monitoring with SIEM
   
   
   ![[Npcap-Installation.png]]
+  
+  
+  ![[Npcap-Verify.png]]
+  
+  
