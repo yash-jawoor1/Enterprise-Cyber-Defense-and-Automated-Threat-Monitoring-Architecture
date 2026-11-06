@@ -141,3 +141,8 @@ While detection is critical, prevention strengthens system defenses against brut
 - Regularly monitor login activity via SIEM solutions.
     
 - Implement rate-limiting, account lockout policies, or fail2ban mechanisms to restrict login attempts after repeated failures.
+  
+  
+  
+  
+  ![[Logon-Failure.png]]
