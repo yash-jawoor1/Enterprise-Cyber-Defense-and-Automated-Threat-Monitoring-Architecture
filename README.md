@@ -1,4 +1,4 @@
-# Enterprise Cyber Defense Operations & Automated Threat Monitoring Architecture (ECDOMA-Lab)
+# Enterprise Cyber Defense Operations & Automated Threat Monitoring Architecture 
 
 ## 📌 Executive Summary & Project Overview
 
