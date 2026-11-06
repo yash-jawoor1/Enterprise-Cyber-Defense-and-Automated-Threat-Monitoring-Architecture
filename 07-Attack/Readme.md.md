@@ -145,4 +145,6 @@ While detection is critical, prevention strengthens system defenses against brut
   
   
   
-  ![[Logon-Failure.png]]
+  ![[Brute Force Attack.png]]
+  
+  
