@@ -1,199 +1,84 @@
+# 🛡️ Step 4: Suricata IDS/IPS Integration with Wazuh SIEM
 
-# Suricata IDS/IPS Integration with Wazuh SIEM
+## 1. Overview & Objectives
 
-## 1. Introduction
+An **Intrusion Detection System (IDS)** and **Intrusion Prevention System (IPS)** form a core pillar of a layered cybersecurity architecture, continuously monitoring network traffic to identify suspicious activities, malicious connections, and active threats.
 
-Intrusion Detection Systems (IDS) and Intrusion Prevention Systems (IPS) are important components of a layered cybersecurity architecture.
+In this phase, **Suricata IDS** is deployed on the Windows endpoint (`WIN-ENDPOINT-01`) and integrated with the **Wazuh SIEM/XDR** platform to centralize network telemetry and security alerts.
 
-They monitor network traffic to identify suspicious activities, malicious connections, and potential security threats.
+### Core Objectives
 
-In this project, I integrated Suricata IDS with Wazuh SIEM to monitor network traffic and centralize security alerts.
-
-### Objectives
-
-- Install and configure Suricata on a Windows endpoint.
+- Install and configure Suricata on the Windows endpoint.
     
-- Capture and inspect network traffic using Npcap.
+- Capture and inspect network traffic using **Npcap**.
     
-- Configure Suricata rules for threat detection.
+- Configure Suricata detection rules (`local.rules` and Emerging Threats rules).
     
-- Enable EVE JSON logging.
+- Enable structured **EVE JSON** logging.
     
-- Integrate Suricata logs with the Wazuh Agent.
+- Ingest Suricata logs via the local Windows **Wazuh Agent**.
     
-- Monitor Suricata security events through the Wazuh Dashboard.
+- Monitor and verify network security events in the Wazuh Dashboard.
     
 
----
+## 2. IDS vs. IPS Conceptual Overview
 
-## 2. IDS vs. IPS Overview
-
-### 2.1 Intrusion Detection System (IDS)
-
-An IDS monitors network traffic and identifies suspicious or malicious activities.
-
-Detection methods include:
-
-- Signature-based detection using predefined rules.
-    
-- Indicators of Compromise (IoCs), including hashes, domains, URLs, and network fingerprints.
-    
-- Lua scripting for customized detection logic.
-    
-
-An IDS generates alerts and logs when suspicious activity is detected. It does not actively block traffic.
-
-### 2.2 Intrusion Prevention System (IPS)
-
-An IPS monitors network traffic and takes preventive action based on configured security policies.
-
-Its functions include:
-
-- Detecting malicious network traffic.
-    
-- Dropping suspicious or malicious packets.
-    
-- Allowing legitimate network traffic.
-    
-- Preventing certain attacks in real time.
-    
-
-### IDS vs. IPS Comparison
-
-|Feature|IDS|IPS|
+|**Feature**|**Intrusion Detection System (IDS)**|**Intrusion Prevention System (IPS)**|
 |---|---|---|
-|Traffic monitoring|Yes|Yes|
-|Threat detection|Yes|Yes|
-|Alert generation|Yes|Yes|
-|Traffic blocking|No|Yes|
-|Primary purpose|Detection|Prevention|
+|**Traffic Monitoring**|Yes (Passive)|Yes (Active inline)|
+|**Threat Detection**|Yes|Yes|
+|**Alert Generation**|Yes|Yes|
+|**Traffic Blocking**|**No**|**Yes** (Drops malicious packets)|
+|**Primary Purpose**|Detection, Logging & Analysis|Prevention, Mitigation & Blocking|
 
----
+## 3. Suricata Installation & Configuration
 
-## 3. About Suricata
+### 3.1 Installation Procedure
 
-Suricata is an open-source network threat detection engine capable of operating as:
-
-- Intrusion Detection System (IDS)
+1. Download the official Windows `.msi` installer from the [Suricata Download Page](https://suricata.io/download/).
     
-- Intrusion Prevention System (IPS)
+2. Execute the installer and complete the setup wizard.
     
-- Network Security Monitoring (NSM) engine
+3. Default installation directory: `C:\Program Files\Suricata\`
     
 
-In IDS mode, Suricata monitors network traffic and generates alerts when configured detection rules match.
+### 3.2 Npcap Packet Capture Prerequisite
 
-In IPS mode, it can take action against malicious traffic, including dropping packets.
+Suricata relies on **Npcap** to capture raw network packets from Windows network adapters.
 
-### 3.1 Download and Install Suricata
-
-I used the official Suricata download page:
-
-[https://suricata.io/download/](https://suricata.io/download/)
-
-Installation steps:
-
-1. Downloaded the Windows installer (`.msi`).
+1. Download and install Npcap with **WinPcap API-compatible mode** enabled and set to start at boot.
     
-2. Executed the installer.
+2. Verify the Npcap service status via PowerShell (Administrator):
     
-3. Followed the installation wizard.
+    PowerShell
     
-4. Completed the installation using the selected installation settings.
+    ```
+    Get-Service -Name npcap
+    ```
+    
+    _Expected Output:_ Status should report **`Running`**.
     
 
-**Default installation directory:**
+## 4. Configuration File Setup (`suricata.yaml`)
 
-`C:\Program Files\Suricata\`
+Edit the main configuration file located at `C:\Program Files\Suricata\suricata.yaml`:
 
-### Important Files and Directories
+### 4.1 Interface Selection
 
-|File / Directory|Purpose|
-|---|---|
-|`suricata.exe`|Main Suricata executable|
-|`suricata.yaml`|Main configuration file|
-|`rules\`|Directory containing detection rules|
-|`log\`|Directory containing Suricata logs|
+Identify the active network interface name using PowerShell (`Get-NetAdapter | Select-Object Name, Status`), then bind Suricata using `af-packet`:
 
----
-
-## 4. Npcap Installation and Verification
-
-Suricata uses Npcap to capture network packets from Windows network interfaces.
-
-### 4.1 Install Npcap
-
-Downloaded Npcap from:
-
-[https://npcap.com/#download](https://npcap.com/#download)
-
-During installation, I selected:
-
-- WinPcap API-compatible mode.
-    
-- Start the Npcap driver at boot time.
-    
-
-### 4.2 Verify Npcap Service
-
-Opened PowerShell as Administrator and executed:
-
-```
-Get-Service -Name npcap
-```
-
-This command checks whether the Npcap packet capture driver service is installed and running.
-
-**Expected status:** `Running`
-
-If the service is stopped, it can be started using:
-
-```
-Start-Service -Name npcap
-```
-
----
-
-## 5. Configuring Suricata
-
-### 5.1 Open the Configuration File
-
-Opened the Suricata configuration file:
-
-`C:\Program Files\Suricata\suricata.yaml`
-
-This file controls network interfaces, rule files, logging, and other Suricata settings.
-
-### 5.2 Identify Network Interfaces
-
-To identify available Windows network adapters, executed:
-
-```
-Get-NetAdapter | Select-Object Name, Status
-```
-
-This command displays network adapter names and their operational status.
-
-I used the appropriate active network interface for packet monitoring.
-
-### 5.3 Configure Network Interface
-
-Located the `af-packet` configuration section in `suricata.yaml`.
-
-Example configuration:
+YAML
 
 ```
 af-packet:
-  - interface: Wi-Fi
+  - interface: "Wi-Fi"  # Replace with active adapter name (e.g., Ethernet or Wi-Fi)
 ```
 
-The interface name must match the actual Windows network adapter selected for monitoring.
+### 4.2 Rule Files Configuration
 
-### 5.4 Configure Rule Files
+Configure rule sets to include local definitions and Emerging Threats rules:
 
-Located the `rule-files` section in `suricata.yaml`.
-
-Configured the required rule files:
+YAML
 
 ```
 rule-files:
@@ -201,18 +86,11 @@ rule-files:
   - emerging-all.rules
 ```
 
-**Rule file explanation:**
+### 4.3 Enable EVE JSON Output
 
-- `local.rules`: Contains locally configured detection rules.
-    
-- `emerging-all.rules`: Contains Emerging Threats detection rules.
-    
+EVE JSON provides structured event logs optimized for SIEM ingestion:
 
-The rule files must exist in the configured rules directory.
-
-### 5.5 Enable EVE JSON Logging
-
-Configured EVE JSON output in `suricata.yaml`.
+YAML
 
 ```
 outputs:
@@ -222,73 +100,35 @@ outputs:
       filename: eve.json
 ```
 
-EVE JSON provides structured event information that can be consumed by SIEM platforms such as Wazuh.
+_Log Output Path:_ `C:\Program Files\Suricata\log\eve.json`
 
-The log file is generated in:
+## 5. Running Suricata & Verifying Logs
 
-`C:\Program Files\Suricata\log\eve.json`
+Open PowerShell as Administrator, navigate to the installation directory, and start Suricata:
 
----
-
-## 6. Running Suricata
-
-Opened PowerShell as Administrator.
-
-Navigated to the Suricata installation directory:
+PowerShell
 
 ```
 cd "C:\Program Files\Suricata\"
-```
-
-Started Suricata using its configuration file and selected network interface:
-
-```
 .\suricata.exe -c .\suricata.yaml -i "Wi-Fi"
 ```
 
-The interface name should be replaced with the actual adapter name.
+### Key Suricata Log Files (`C:\Program Files\Suricata\log\`)
 
-### 6.1 Suricata Log Files
+- **`eve.json`**: Structured JSON log containing security alerts, DNS queries, TLS handshakes, and flow data.
+    
+- **`fast.log`**: Human-readable text file showing brief intrusion alerts.
+    
+- **`stats.log`**: Engine performance and packet-drop statistics.
+    
 
-Suricata stores its logs in:
+## 6. Integrating Suricata with Wazuh SIEM
 
-`C:\Program Files\Suricata\log\`
+### Step 6.1: Configure Wazuh Agent Log Ingestion
 
-Important log files:
+On the Windows endpoint, open the Wazuh Agent configuration file (`C:\Program Files (x86)\ossec-agent\ossec.conf`) and add the following JSON localfile block inside the `<ossec_config>` root element:
 
-|Log File|Purpose|
-|---|---|
-|`eve.json`|Structured JSON events and alerts|
-|`fast.log`|Human-readable security alerts|
-|`stats.log`|Suricata performance and statistics|
-
-These logs provide information about network activity, detected threats, and engine performance.
-
----
-
-## 7. Integrating Suricata with Wazuh SIEM
-
-The next step was to integrate Suricata with Wazuh so that network security events could be centrally monitored.
-
-### 7.1 Verify EVE JSON Output
-
-Checked the Suricata log directory:
-
-`C:\Program Files\Suricata\log\`
-
-The primary file used for integration is:
-
-`eve.json`
-
-This file contains structured network events generated by Suricata.
-
-### 7.2 Configure Wazuh Agent
-
-On the Windows endpoint, opened the Wazuh Agent configuration file:
-
-`C:\Program Files (x86)\ossec-agent\ossec.conf`
-
-Added the following localfile configuration inside the existing `<ossec_config>` element:
+XML
 
 ```
 <localfile>
@@ -297,128 +137,43 @@ Added the following localfile configuration inside the existing `<ossec_config>`
 </localfile>
 ```
 
-**Configuration explanation:**
+### Step 6.2: Restart the Wazuh Agent Service
 
-|Parameter|Purpose|
-|---|---|
-|`localfile`|Configures a log file for monitoring|
-|`log_format`|Specifies JSON as the log format|
-|`location`|Defines the path to the Suricata EVE JSON file|
+Apply configuration changes by restarting the Windows agent service via PowerShell (Administrator):
 
-This configuration allows the Wazuh Agent to monitor Suricata's EVE JSON logs and forward collected events to the Wazuh Manager.
-
-### 7.3 Restart Wazuh Agent
-
-Opened PowerShell as Administrator and executed:
+PowerShell
 
 ```
-Restart-Service -Name wazuh
+Restart-Service -Name WazuhSvc
 ```
 
-This restarts the Wazuh Agent so that the updated configuration can be applied.
+### Step 6.3: Generate Traffic & Verify EVE Log Ingestion
 
-### 7.4 Generate Test Traffic
-
-Generated network traffic using:
-
-```
-ping google.com
-```
-
-This produces ICMP traffic that can be observed by Suricata when the selected interface is capturing the traffic.
-
-Note: A normal ping does not necessarily trigger a security alert. It can be used to check network visibility and event logging.
-
-### 7.5 Verify Suricata Logs
-
-Checked the Suricata EVE JSON file:
-
-```
-Get-Content "C:\Program Files\Suricata\log\eve.json" -Tail 20
-```
-
-This command displays the latest entries written to the EVE JSON log.
-
-### 7.6 View Events in Wazuh Dashboard
-
-Opened the Wazuh Dashboard and navigated to:
-
-**Threat Hunting**
-
-Used the available event filters to search for Suricata-related events.
-
-The objective is to verify that Suricata events collected by the Windows Wazuh Agent are visible in the Wazuh SIEM.
-
----
-
-## 8. Prerequisites and Dependencies
-
-The following components are required for this integration:
-
-1. A running Wazuh SIEM environment.
+1. Generate test network traffic (e.g., `ping google.com` or browsing HTTPS sites).
     
-2. A connected Windows Wazuh Agent.
+2. Inspect the latest entries in the EVE JSON log:
     
-3. Suricata installed on the Windows endpoint.
+    PowerShell
     
-4. Npcap installed and running.
+    ```
+    Get-Content "C:\Program Files\Suricata\log\eve.json" -Tail 20
+    ```
     
-5. A configured Suricata network interface.
-    
-6. Valid Suricata detection rule files.
-    
-7. EVE JSON logging enabled.
+3. Navigate to the **Wazuh Dashboard** $\rightarrow$ **Threat Hunting** to filter and confirm that Suricata network alerts and event logs are actively populating the SIEM index.
     
 
-A VirusTotal API key is also required if VirusTotal integration is included in the broader lab workflow. It is not required for basic Suricata EVE JSON collection by the Wazuh Agent.
+## 7. SOC Analyst Verification Checklist
 
----
-
-## 9. Conclusion
-
-In this project, I configured Suricata as a network intrusion detection engine and integrated its EVE JSON logs with Wazuh SIEM.
-
-The integration connects network-level threat monitoring with centralized security event analysis.
-
-Suricata is responsible for inspecting network traffic and generating security events, while Wazuh collects and analyzes those events through its Windows Agent.
-
-This setup demonstrates the integration of network security monitoring with SIEM-based log management and threat detection.
-
-### Key Skills Demonstrated
-
-- Network Intrusion Detection.
+- [x] Suricata successfully installed (`C:\Program Files\Suricata\`).
     
-- Suricata IDS Configuration.
+- [x] Npcap packet capture driver verified and running (`Running`).
     
-- Npcap Packet Capture.
+- [x] `suricata.yaml` configured with the correct network interface and rule files (`local.rules`, `emerging-all.rules`).
     
-- Network Traffic Monitoring.
+- [x] EVE JSON output enabled and writing to `eve.json`.
     
-- EVE JSON Logging.
+- [x] Wazuh agent `ossec.conf` updated to ingest JSON logs from the Suricata log directory.
     
-- Windows Wazuh Agent Configuration.
+- [x] Wazuh Agent service restarted successfully (`WazuhSvc`).
     
-- SIEM Log Integration.
-    
-- Security Event Monitoring.
-  
-  
-  
-  
-  ![[Suricata-Installation.png]]
-  
-  
-  ![[Npcap-Installation.png]]
-  
-  
-  ![[Npcap-Verify.png]]
-  
-  ![[Suricata running with Engine started.png]]
-  
-  
-  ![[fast.log showing ICMP Test Alert..png]]
-  
-  
-  ![[eve.json showing DNS and TLS events..png]]
-  
-  ![[wazuh-dashboard.png]]
+- [x] Suricata events verified in the Wazuh Dashboard Threat Hunting portal.

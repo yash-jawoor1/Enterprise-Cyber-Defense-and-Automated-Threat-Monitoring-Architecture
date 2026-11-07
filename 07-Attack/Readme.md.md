@@ -1,150 +1,71 @@
+# 🚨 Step 6: SSH Brute Force Attack Simulation, Detection & Analysis
 
+## 1. Overview & Threat Context
 
-# Brute Force Attack: Simulation, Detection & Defense
+A **brute force attack** is a trial-and-error method where an attacker systematically submits multiple password combinations until the correct credential is guessed. It remains one of the most common threat vectors used to gain unauthorized access to network services.
 
-## 33. Introduction
+> **Disclaimer:** The following documentation describes a controlled security simulation performed within an isolated lab environment (`Kali Linux` attacker node targeting a `Windows 11` endpoint via OpenSSH). Unauthorized testing against production systems is illegal and strictly prohibited.
 
-A brute force attack is a method where an attacker tries multiple password or key combinations repeatedly until the correct one is found. It is one of the simplest yet most common attack techniques used to gain unauthorized access to systems, applications, or accounts.
+## 2. Attack Tooling & Wordlist Strategy (`rockyou.txt`)
 
-> **Disclaimer:** The following content is for educational and ethical purposes only. These techniques should only be executed in a controlled lab environment with explicit permission. Unauthorized use against systems you do not own or manage is illegal and punishable by law.
+### 2.1 Why Hydra?
 
-## 34. Types of Brute Force Attacks
+**THC-Hydra** is a high-speed network login cracker supporting over 50 protocols (including SSH, FTP, HTTP, SMB, and RDP). It is widely used by security professionals to test authentication resilience against dictionary attacks.
 
-- **Simple brute force attack:** Directly attempting all possible combinations of passwords.
-    
-- **Dictionary attack:** Using a predefined list of likely passwords (a “dictionary”) instead of trying every possible combination.
-    
-- **Hybrid brute force attack:** Combining dictionary attacks with variations (e.g., adding numbers or symbols).
-    
-- **Reverse brute force attack:** Starting with a single commonly used password and trying it against many usernames.
-    
-- **Credential stuffing:** Using leaked username-password pairs from previous data breaches to attempt logins on other systems.
-    
+### 2.2 The Industry Standard: `rockyou.txt`
 
-## 35. Popular Brute Force Tools
+Instead of using a trivial or custom file, the industry-standard **`rockyou.txt`** wordlist (containing over 14 million real-world passwords derived from historical data breaches, located at `/usr/share/wordlists/rockyou.txt` on Kali Linux) was utilized for the simulation.
 
-- **John the Ripper:** A fast password cracker for Unix, Windows, and other platforms.
-    
-- **Hashcat:** A powerful GPU-based password recovery tool, ideal for cracking password hashes.
-    
-- **Aircrack-ng:** Focused on cracking Wi-Fi network keys.
-    
-- **L0phtCrack:** Used to audit and recover Windows passwords.
-    
+## 3. Attack Simulation Procedure
 
-## 36. Hydra for Brute Force Attacks
+### Step 3.1: Executing the Hydra Command from Kali Linux
 
-Hydra is one of the most widely used tools for network login brute forcing. It can perform rapid dictionary-based attacks against more than 50 protocols, including HTTP, SSH, FTP, RDP, Telnet, and more.
-
-### 36.1 Hydra Command Structure
+From the attacker machine (Kali Linux), the network brute force attack was launched against the target Windows endpoint OpenSSH service over port 22:
 
 Bash
 
 ```
-hydra -L <user_file> -P <pass_file> <service>://<target_ip>
+hydra -l Yash -P /usr/share/wordlists/rockyou.txt ssh://<WINDOWS_IP>
 ```
 
-- `-L`: Specifies the file containing a list of usernames.
+- **`-l Yash`**: Specifies the targeted username on the target system.
     
-- `-P`: Specifies the file containing a list of passwords.
+- **`-P /usr/share/wordlists/rockyou.txt`**: Points to the comprehensive Kali Linux password wordlist.
     
-
-## 37. Brute Force SSH
-
-A brute force SSH attack attempts to gain unauthorized access to a remote machine by repeatedly trying different username and password combinations against the SSH service (port 22 by default).
-
-### 37.1 Example Hydra Command
-
-Bash
-
-```
-hydra -l Yash -P passwords.txt ssh://<WINDOWS_IP>
-```
-
-## 38. System Requirements
-
-- **Attacker Machine:** Kali Linux
-    
-- **Target Machine:** Windows system (with SSH enabled via OpenSSH Server)
+- **`ssh://<WINDOWS_IP>`**: Defines the target protocol, port (22), and destination IP address.
     
 
-## 39. Simulating an SSH Brute Force Attack with Hydra
+### Step 3.2: Attack Execution Flow
 
-### 39.1 Step 1: Preparing the Password List
-
-On the attacker machine (Kali Linux), we first create a list of possible passwords in a file named `passwords.txt`. This file will be used by Hydra to attempt login combinations against the target system.
-
-### 39.2 Step 2: Running the Hydra Command
-
-Since we already know the username of the target system is `Yash`, we use the `-l` option to specify it directly. If we did not know the username, we could use the `-L` option along with a file containing a list of usernames.
-
-Bash
-
-```
-hydra -l Yash -P passwords.txt ssh://<WINDOWS_IP>
-```
-
-### 39.3 Step 3: Observing the Attack
-
-Hydra will automatically attempt multiple login attempts using the given username and password list. Each failed login attempt is logged by the target’s SSH service (`sshd.exe`).
-
-## 40. Detection in Wazuh
-
-After simulating the brute force attack, we switch to the Wazuh dashboard. In the Threat Hunting section, we can observe key indicators:
-
-- Multiple failed login attempts for the SSH service.
+- **Attacker Side (Kali Linux):** Reads passwords locally from `/usr/share/wordlists/rockyou.txt` and transmits network authentication requests across the internal network.
     
-- Alerts triggered by Wazuh security rules detecting brute force activity.
-    
-- Event details, such as the source IP (attacker machine) and the affected service (SSH).
+- **Target Side (Windows Endpoint):** The OpenSSH server daemon (`C:\Windows\System32\OpenSSH\sshd.exe`) receives the incoming connection attempts, processes authentication failures, and logs every failed try locally to the Windows Security Event Log.
     
 
-### Windows Security Event Analysis (Event ID 4625)
+## 4. Wazuh SIEM Detection & Windows Event Analysis
 
-| Field Name                            | Field Value                            | Meaning                                                                                                   |
-| ------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `data.win.eventdata.failureReason`    | `%%2313`                               | Unknown username or bad password.                                                                         |
-| `data.win.eventdata.keyLength`        | `0`                                    | No encryption key was used.                                                                               |
-| `data.win.eventdata.logonProcessName` | `Advapi`                               | Typical for services, not interactive logins.                                                             |
-| `data.win.eventdata.logonType`        | `8`                                    | Logon type 8 = Network Cleartext. Credentials were sent in cleartext over the network (common with SSHD). |
-| `data.win.eventdata.processId`        | `0x65d8`                               | The process ID (`0x65d8`) of the process that attempted the logon.                                        |
-| `data.win.eventdata.processName`      | `C:\Windows\System32\OpenSSH\sshd.exe` | Confirms someone tried to connect to this machine over SSH.                                               |
-| `data.win.eventdata.status`           | `0xc000006d`                           | Status = Logon failure.                                                                                   |
-| `data.win.eventdata.subStatus`        | `0xc0000064`                           | User logon with unknown username OR bad password.                                                         |
-| `data.win.system.channel`             | `Security`                             | The event comes from the Windows Security log.                                                            |
-| `data.win.system.eventID`             | `4625`                                 | Event ID 4625 = An account failed to log on.                                                              |
-| `data.win.system.eventRecordID`       | `919137`                               | A unique sequential ID for this event in the event log.                                                   |
-| `data.win.system.systemTime`          | `2026-11-05T12:00:00.0000000Z`         | Event timestamp (UTC).                                                                                    |
-| `decoder.name`                        | `windows_eventchannel`                 | Wazuh parsed this as a Windows Event Channel log.                                                         |
-| `input.type`                          | `log`                                  | Confirms this came from a log source (Windows logs).                                                      |
-| `rule.firedtimes`                     | `14`                                   | At least 14 failed logins of this type have occurred.                                                     |
+When Hydra floods the Windows SSH daemon, the local Windows Security Log captures the failed logon attempts under **Event ID 4625**, which are streamed in real-time to the central Wazuh Manager.
 
-### Summary of Findings
+### 4.1 Windows Security Event ID 4625 Field Breakdown
 
-- The Windows machine received multiple SSH login attempts via `sshd.exe`.
-    
-- Authentication failed with error _Unknown username or bad password_ (`0xc0000064`).
-    
-- This was logged locally as **Event ID 4625 (failed logon)**.
-    
-- Wazuh classified it under failed authentication events, mapped it to compliance frameworks, and recorded multiple rule firings, indicating an active brute force pattern rather than an isolated typo.
-    
+|Field Name|Extracted Value|Analysis & Meaning|
+|---|---|---|
+|**`data.win.system.eventID`**|`4625`|An account failed to log on.|
+|**`data.win.system.channel`**|`Security`|Source event log channel on Windows.|
+|**`data.win.eventdata.processName`**|`C:\Windows\System32\OpenSSH\sshd.exe`|Identifies the targeted service daemon (OpenSSH).|
+|**`data.win.eventdata.logonType`**|`8`|Network Cleartext logon (credentials transmitted in cleartext over network, standard for SSH brute forcing).|
+|**`data.win.eventdata.status`**|`0xc000006d`|General logon failure status code.|
+|**`data.win.eventdata.subStatus`**|`0xc0000064`|Unknown username or bad password.|
+|**`rule.firedtimes`**|`14+`|Multiple repeated failures indicating an automated brute force pattern rather than an isolated typo.|
 
-## 41. Defensive Countermeasures
+## 5. Defensive Countermeasures & Remediation
 
-While detection is critical, prevention strengthens system defenses against brute force attempts. Recommended strategies include:
+To mitigate network brute force risks against SSH services, implement the following hardening practices:
 
-- Use strong and unique passwords.
+- **Enforce Key-Based Authentication:** Disable password authentication entirely in `sshd_config` and enforce strict SSH public keys.
     
-- Enable multi-factor authentication (MFA).
+- **Rate-Limiting & Account Lockout:** Configure account lockout policies or deploy intrusion prevention tools (e.g., `fail2ban`) to block malicious source IPs after repeated failures.
     
-- Regularly monitor login activity via SIEM solutions.
+- **Network Segmentation:** Restrict SSH access (port 22) to trusted administrative subnet ranges using perimeter firewall rules (pfSense).
     
-- Implement rate-limiting, account lockout policies, or fail2ban mechanisms to restrict login attempts after repeated failures.
-  
-  
-  
-  
-  ![[Brute Force Attack.png]]
-  
-  
+- **SIEM Monitoring:** Continuously monitor Windows Security Event ID 4625 spikes to detect active credential-harvesting attacks.
