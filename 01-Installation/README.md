@@ -87,3 +87,12 @@ systemctl status wazuh-dashboard
     - Verify the **Security Events** baseline tab loads without database connection errors.
         
 
+### 5. SOC Analyst Verification Checklist
+
+- [x] Wazuh OVA successfully imported with 4+ CPU cores and 8GB+ RAM.
+    
+- [x] Static / DHCP IP assigned and pingable from Kali and Windows nodes.
+    
+- [x] All core services (`wazuh-manager`, `wazuh-indexer`, `wazuh-dashboard`) running without errors.
+    
+- [x] Web GUI accessible via `https://<IP>` with active administrative privileges.
